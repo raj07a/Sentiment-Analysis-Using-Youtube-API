@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from textblob import TextBlob
 
-API_KEY = "AIzaSyDV7Wfx8L4GAe6Daxfzpk97x1RECLfZ2ho"
+API_KEY = "AIzaSyCTq87acdKUahj50FCgfPgW2rAfQgpE_8k"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
 
 # Function to fetch YouTube video data
