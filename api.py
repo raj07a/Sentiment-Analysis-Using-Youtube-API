@@ -4,7 +4,6 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 from textblob import TextBlob
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 API_KEY = "AIzaSyCTq87acdKUahj50FCgfPgW2rAfQgpE_8k"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
@@ -79,14 +78,6 @@ def perform_sentiment_analysis(df):
     df['description_sentiment'] = df['description_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
     return df
 
-# Function to calculate accuracy scores
-def calculate_accuracy_scores(y_true, y_pred):
-    accuracy = accuracy_score(y_true, y_pred)
-    precision = precision_score(y_true, y_pred, average='weighted')
-    recall = recall_score(y_true, y_pred, average='weighted')
-    f1 = f1_score(y_true, y_pred, average='weighted')
-    return accuracy, precision, recall, f1
-
 # Main function to fetch, process, and visualize YouTube data
 def main():
     st.title('YouTube Sentiment Analysis Dashboard')
@@ -124,23 +115,13 @@ def main():
     st.write("### Sample of YouTube Video Data:")
     st.write(df.head())
 
-    # Calculating accuracy scores
-    y_true = df_comments['comment_sentiment']
-    y_pred = df_comments['comment_sentiment']  # Assuming same values for demo purposes
-    accuracy, precision, recall, f1 = calculate_accuracy_scores(y_true, y_pred)
-
-    st.write(f"Accuracy: {accuracy}")
-    st.write(f"Precision: {precision}")
-    st.write(f"Recall: {recall}")
-    st.write(f"F1 Score: {f1}")
-
     # Visualizations
     st.header('Video Statistics')
 
     # Sentiment Distribution
     st.subheader('Overall Sentiment Distribution')
     fig1, ax1 = plt.subplots()
-    sns.countplot(data=df, x='overall_sentiment', palette='coolwarm', ax=ax1)
+    sns.countplot(data=df, x='overall_sentiment', palette='viridis', ax=ax1)
     ax1.set_title('Distribution of Overall Sentiment')
     st.pyplot(fig1)
 
@@ -148,21 +129,21 @@ def main():
     st.subheader('Like-Dislike Ratio Distribution')
     df['like_dislike_ratio'] = df['likes'] / df['dislikes'].replace({0: 1})
     fig2, ax2 = plt.subplots()
-    sns.histplot(data=df, x='like_dislike_ratio', bins=20, kde=True, ax=ax2, color='purple')
+    sns.histplot(data=df, x='like_dislike_ratio', bins=20, kde=True, ax=ax2)
     ax2.set_title('Distribution of Like-Dislike Ratio')
     st.pyplot(fig2)
 
     # Comment Polarity Distribution
     st.subheader('Comment Polarity Distribution')
     fig3, ax3 = plt.subplots()
-    sns.histplot(data=df_comments, x='comment_polarity', bins=20, kde=True, ax=ax3, color='orange')
+    sns.histplot(data=df_comments, x='comment_polarity', bins=20, kde=True, ax=ax3)
     ax3.set_title('Distribution of Comment Polarity')
     st.pyplot(fig3)
 
     # Views vs. Likes Scatter Plot
     st.subheader('Views vs. Likes')
     fig4, ax4 = plt.subplots()
-    sns.scatterplot(data=df, x='views', y='likes', hue='overall_sentiment', palette='coolwarm', ax=ax4)
+    sns.scatterplot(data=df, x='views', y='likes', hue='overall_sentiment', palette='viridis', ax=ax4)
     ax4.set_title('Views vs. Likes Colored by Sentiment')
     ax4.set_xscale('log')
     ax4.set_yscale('log')
