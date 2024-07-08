@@ -1,6 +1,7 @@
-streamlit
+requests
 pandas
+streamlit
 matplotlib
 seaborn
-requests
 textblob
+scikit-learn
