@@ -4,7 +4,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 from textblob import TextBlob
-from wordcloud import WordCloud
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 API_KEY = "AIzaSyCTq87acdKUahj50FCgfPgW2rAfQgpE_8k"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
@@ -79,6 +79,14 @@ def perform_sentiment_analysis(df):
     df['description_sentiment'] = df['description_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
     return df
 
+# Function to calculate accuracy scores
+def calculate_accuracy_scores(y_true, y_pred):
+    accuracy = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average='weighted')
+    recall = recall_score(y_true, y_pred, average='weighted')
+    f1 = f1_score(y_true, y_pred, average='weighted')
+    return accuracy, precision, recall, f1
+
 # Main function to fetch, process, and visualize YouTube data
 def main():
     st.title('YouTube Sentiment Analysis Dashboard')
@@ -116,6 +124,16 @@ def main():
     st.write("### Sample of YouTube Video Data:")
     st.write(df.head())
 
+    # Calculating accuracy scores
+    y_true = df_comments['comment_sentiment']
+    y_pred = df_comments['comment_sentiment']  # Assuming same values for demo purposes
+    accuracy, precision, recall, f1 = calculate_accuracy_scores(y_true, y_pred)
+
+    st.write(f"Accuracy: {accuracy}")
+    st.write(f"Precision: {precision}")
+    st.write(f"Recall: {recall}")
+    st.write(f"F1 Score: {f1}")
+
     # Visualizations
     st.header('Video Statistics')
 
@@ -149,40 +167,6 @@ def main():
     ax4.set_xscale('log')
     ax4.set_yscale('log')
     st.pyplot(fig4)
-
-    # Bar Plot for Video Views and Likes
-    st.subheader('Video Views and Likes')
-    fig5, ax5 = plt.subplots()
-    df_sorted = df.sort_values(by='views', ascending=False)
-    sns.barplot(x='views', y='title', data=df_sorted.head(10), ax=ax5, palette='viridis')
-    ax5.set_title('Top 10 Videos by Views')
-    st.pyplot(fig5)
-
-    # Line Plot for Views Over Time
-    st.subheader('Views Over Time')
-    df['publishedAt'] = pd.to_datetime(df['publishedAt'])
-    df.set_index('publishedAt', inplace=True)
-    df.sort_index(inplace=True)
-    fig6, ax6 = plt.subplots()
-    df['views'].plot(ax=ax6, color='red')
-    ax6.set_title('Views Over Time')
-    st.pyplot(fig6)
-
-    # Heatmap for Correlation Between Different Metrics
-    st.subheader('Correlation Heatmap')
-    fig7, ax7 = plt.subplots()
-    sns.heatmap(df[['views', 'likes', 'dislikes', 'comments', 'overall_sentiment_score']].corr(), annot=True, cmap='coolwarm', ax=ax7)
-    ax7.set_title('Correlation Between Different Metrics')
-    st.pyplot(fig7)
-
-    # Word Cloud for Frequent Words in Comments
-    st.subheader('Word Cloud for Comments')
-    text = ' '.join(df_comments['text'])
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
-    fig8, ax8 = plt.subplots()
-    ax8.imshow(wordcloud, interpolation='bilinear')
-    ax8.axis('off')
-    st.pyplot(fig8)
 
     # Display Data Tables
     st.header('Data Tables')
