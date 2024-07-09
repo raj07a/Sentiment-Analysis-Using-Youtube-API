@@ -170,14 +170,6 @@ def main():
     st.subheader('Filtered Comment Data')
     st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
 
-    # Video Statistics Summary
-    st.subheader('Video Statistics Summary')
-    st.write(df[['views', 'likes', 'dislikes', 'comments']].describe())
-
-    # Dataset Statistics Summary
-    st.subheader('Dataset Statistics Summary')
-    st.write(df.describe())
-
 # Run the Streamlit app
 if __name__ == "__main__":
     st.set_option('deprecation.showPyplotGlobalUse', False)
