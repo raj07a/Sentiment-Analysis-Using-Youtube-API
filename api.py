@@ -3,11 +3,8 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
-from transformers import pipeline
-from apscheduler.schedulers.background import BackgroundScheduler
-
-# Initialize sentiment analysis pipeline
-sentiment_pipeline = pipeline("sentiment-analysis")
+from textblob import TextBlob
+from wordcloud import WordCloud
 
 API_KEY = "AIzaSyCTq87acdKUahj50FCgfPgW2rAfQgpE_8k"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
@@ -76,56 +73,45 @@ def fetch_video_comments(api_key, video_id):
     
     return pd.DataFrame(comments)
 
-# Function to perform sentiment analysis using pre-trained transformer model
-def perform_sentiment_analysis(df, column):
-    df[column + '_sentiment'] = df[column].apply(lambda x: sentiment_pipeline(str(x))[0]['label'])
-    df[column + '_polarity'] = df[column].apply(lambda x: sentiment_pipeline(str(x))[0]['score'] if sentiment_pipeline(str(x))[0]['label'] == 'POSITIVE' else -sentiment_pipeline(str(x))[0]['score'])
+# Function to perform sentiment analysis using TextBlob
+def perform_sentiment_analysis(df):
+    df['description_polarity'] = df['description'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
+    df['description_sentiment'] = df['description_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
     return df
 
-# Function to fetch and process data
-def fetch_and_process_data():
-    df_videos = fetch_youtube_data(API_KEY, CHANNEL_ID)
-    df_stats = fetch_video_statistics(API_KEY, df_videos['videoId'])
-    df = pd.merge(df_videos, df_stats, on='videoId')
-    comments_data = [fetch_video_comments(API_KEY, video_id) for video_id in df['videoId']]
-    df_comments = pd.concat(comments_data, ignore_index=True)
-    df = perform_sentiment_analysis(df, 'description')
-    df_comments = perform_sentiment_analysis(df_comments, 'text')
-    df['overall_sentiment_score'] = (df['description_polarity'] + df_comments.groupby('videoId')['text_polarity'].mean().reindex(df['videoId']).fillna(0)) / 2
-    df['overall_sentiment'] = df['overall_sentiment_score'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
-    df['engagement_rate'] = (df['likes'] + df['comments']) / df['views']
-    df['publishedAt'] = pd.to_datetime(df['publishedAt'])
-    sentiment_trends = df.set_index('publishedAt').resample('W').mean()['overall_sentiment_score']
-    return df, df_comments, sentiment_trends
-
-# Fetch initial data
-df, df_comments, sentiment_trends = fetch_and_process_data()
-
-# Schedule periodic data fetching
-scheduler = BackgroundScheduler()
-scheduler.add_job(fetch_and_process_data, 'interval', minutes=60)
-scheduler.start()
-
-# Main function to display Streamlit dashboard
+# Main function to fetch, process, and visualize YouTube data
 def main():
-    st.markdown(
-        """
-        <style>
-        .reportview-container {
-            background: #f0f2f6;
-        }
-        .sidebar .sidebar-content {
-            background: #f0f2f6;
-        }
-        h1 {
-            color: #4b8bbe;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-    
     st.title('YouTube Sentiment Analysis Dashboard')
+
+    st.write('Fetching data from YouTube API...')
+    
+    # Fetch video data from YouTube API
+    df_videos = fetch_youtube_data(API_KEY, CHANNEL_ID)
+    
+    # Fetch video statistics
+    df_stats = fetch_video_statistics(API_KEY, df_videos['videoId'])
+    
+    # Merge video data with statistics
+    df = pd.merge(df_videos, df_stats, on='videoId')
+    
+    # Fetch and process comments for each video
+    comments_data = []
+    for video_id in df['videoId']:
+        comments = fetch_video_comments(API_KEY, video_id)
+        comments_data.append(comments)
+    
+    df_comments = pd.concat(comments_data, ignore_index=True)
+    
+    # Perform sentiment analysis on descriptions
+    df = perform_sentiment_analysis(df)
+    
+    # Perform sentiment analysis on comments
+    df_comments['comment_polarity'] = df_comments['text'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
+    df_comments['comment_sentiment'] = df_comments['comment_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
+    
+    # Calculate overall sentiment score
+    df['overall_sentiment_score'] = (df['description_polarity'] + df_comments.groupby('videoId')['comment_polarity'].mean().reindex(df['videoId']).fillna(0)) / 2
+    df['overall_sentiment'] = df['overall_sentiment_score'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
 
     st.write("### Sample of YouTube Video Data:")
     st.write(df.head())
@@ -136,7 +122,8 @@ def main():
     # Sentiment Distribution
     st.subheader('Overall Sentiment Distribution')
     fig1, ax1 = plt.subplots()
-    sns.countplot(data=df, x='overall_sentiment', palette='viridis', ax=ax1)
+    df['overall_sentiment'].value_counts().plot(kind='pie', autopct='%1.1f%%', colors=['#66c2a5', '#fc8d62', '#8da0cb'], ax=ax1)
+    ax1.set_ylabel('')
     ax1.set_title('Distribution of Overall Sentiment')
     st.pyplot(fig1)
 
@@ -144,14 +131,14 @@ def main():
     st.subheader('Like-Dislike Ratio Distribution')
     df['like_dislike_ratio'] = df['likes'] / df['dislikes'].replace({0: 1})
     fig2, ax2 = plt.subplots()
-    sns.histplot(data=df, x='like_dislike_ratio', bins=20, kde=True, ax=ax2)
+    sns.kdeplot(data=df, x='like_dislike_ratio', ax=ax2, fill=True, color='skyblue')
     ax2.set_title('Distribution of Like-Dislike Ratio')
     st.pyplot(fig2)
 
     # Comment Polarity Distribution
     st.subheader('Comment Polarity Distribution')
     fig3, ax3 = plt.subplots()
-    sns.histplot(data=df_comments, x='text_polarity', bins=20, kde=True, ax=ax3)
+    sns.violinplot(data=df_comments, x='comment_polarity', ax=ax3, inner='quartile', palette='muted')
     ax3.set_title('Distribution of Comment Polarity')
     st.pyplot(fig3)
 
@@ -164,11 +151,14 @@ def main():
     ax4.set_yscale('log')
     st.pyplot(fig4)
 
-    # Sentiment Trends Over Time
-    st.subheader('Sentiment Trends Over Time')
+    # Word Cloud for Comments
+    st.subheader('Word Cloud of Comments')
+    comment_words = ' '.join(df_comments['text'].tolist())
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(comment_words)
     fig5, ax5 = plt.subplots()
-    sentiment_trends.plot(ax=ax5)
-    ax5.set_title('Sentiment Trends Over Time')
+    ax5.imshow(wordcloud, interpolation='bilinear')
+    ax5.axis('off')
+    ax5.set_title('Word Cloud of Comments')
     st.pyplot(fig5)
 
     # Display Data Tables
@@ -178,7 +168,7 @@ def main():
     st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
 
     st.subheader('Filtered Comment Data')
-    st.write(df_comments[['videoId', 'author', 'text', 'text_polarity', 'text_sentiment']])
+    st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
 
 # Run the Streamlit app
 if __name__ == "__main__":
