@@ -4,6 +4,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 from textblob import TextBlob
+from wordcloud import WordCloud
 
 API_KEY = "AIzaSyDV7Wfx8L4GAe6Daxfzpk97x1RECLfZ2ho"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
@@ -116,20 +117,13 @@ def main():
     st.write(df.head())
 
     # Visualizations
-    # Display Data Tables
-    st.header('Data Tables')
-
-    st.subheader('Filtered Video Data')
-    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
-
-    st.subheader('Filtered Comment Data')
-    st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
     st.header('Video Statistics')
 
     # Sentiment Distribution
     st.subheader('Overall Sentiment Distribution')
     fig1, ax1 = plt.subplots()
-    sns.countplot(data=df, x='overall_sentiment', palette='viridis', ax=ax1)
+    df['overall_sentiment'].value_counts().plot(kind='pie', autopct='%1.1f%%', colors=['#66c2a5', '#fc8d62', '#8da0cb'], ax=ax1)
+    ax1.set_ylabel('')
     ax1.set_title('Distribution of Overall Sentiment')
     st.pyplot(fig1)
 
@@ -137,14 +131,14 @@ def main():
     st.subheader('Like-Dislike Ratio Distribution')
     df['like_dislike_ratio'] = df['likes'] / df['dislikes'].replace({0: 1})
     fig2, ax2 = plt.subplots()
-    sns.histplot(data=df, x='like_dislike_ratio', bins=20, kde=True, ax=ax2)
+    sns.kdeplot(data=df, x='like_dislike_ratio', ax=ax2, fill=True, color='skyblue')
     ax2.set_title('Distribution of Like-Dislike Ratio')
     st.pyplot(fig2)
 
     # Comment Polarity Distribution
     st.subheader('Comment Polarity Distribution')
     fig3, ax3 = plt.subplots()
-    sns.histplot(data=df_comments, x='comment_polarity', bins=20, kde=True, ax=ax3)
+    sns.violinplot(data=df_comments, x='comment_polarity', ax=ax3, inner='quartile', palette='muted')
     ax3.set_title('Distribution of Comment Polarity')
     st.pyplot(fig3)
 
@@ -157,7 +151,32 @@ def main():
     ax4.set_yscale('log')
     st.pyplot(fig4)
 
-    
+    # Word Cloud for Comments
+    st.subheader('Word Cloud of Comments')
+    comment_words = ' '.join(df_comments['text'].tolist())
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(comment_words)
+    fig5, ax5 = plt.subplots()
+    ax5.imshow(wordcloud, interpolation='bilinear')
+    ax5.axis('off')
+    ax5.set_title('Word Cloud of Comments')
+    st.pyplot(fig5)
+
+    # Display Data Tables
+    st.header('Data Tables')
+
+    st.subheader('Filtered Video Data')
+    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
+
+    st.subheader('Filtered Comment Data')
+    st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
+
+    # Video Statistics Summary
+    st.subheader('Video Statistics Summary')
+    st.write(df[['views', 'likes', 'dislikes', 'comments']].describe())
+
+    # Dataset Statistics Summary
+    st.subheader('Dataset Statistics Summary')
+    st.write(df.describe())
 
 # Run the Streamlit app
 if __name__ == "__main__":
