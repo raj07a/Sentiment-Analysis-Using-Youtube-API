@@ -118,7 +118,22 @@ def main():
 
     # Visualizations
     st.header('Video Statistics')
+    # Display Data Tables
+    st.header('Data Tables')
 
+    st.subheader('Filtered Video Data')
+    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
+
+    st.subheader('Filtered Comment Data')
+    st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
+
+    # Video Statistics Summary
+    st.subheader('Video Statistics Summary')
+    st.write(df[['views', 'likes', 'dislikes', 'comments']].describe())
+
+    # Dataset Statistics Summary
+    st.subheader('Dataset Statistics Summary')
+    st.write(df.describe())
     # Sentiment Distribution
     st.subheader('Overall Sentiment Distribution')
     fig1, ax1 = plt.subplots()
@@ -161,22 +176,7 @@ def main():
     ax5.set_title('Word Cloud of Comments')
     st.pyplot(fig5)
 
-    # Display Data Tables
-    st.header('Data Tables')
-
-    st.subheader('Filtered Video Data')
-    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
-
-    st.subheader('Filtered Comment Data')
-    st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
-
-    # Video Statistics Summary
-    st.subheader('Video Statistics Summary')
-    st.write(df[['views', 'likes', 'dislikes', 'comments']].describe())
-
-    # Dataset Statistics Summary
-    st.subheader('Dataset Statistics Summary')
-    st.write(df.describe())
+    
 
 # Run the Streamlit app
 if __name__ == "__main__":
