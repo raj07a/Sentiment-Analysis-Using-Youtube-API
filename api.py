@@ -116,6 +116,14 @@ def main():
     st.write(df.head())
 
     # Visualizations
+    # Display Data Tables
+    st.header('Data Tables')
+
+    st.subheader('Filtered Video Data')
+    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
+
+    st.subheader('Filtered Comment Data')
+    st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
     st.header('Video Statistics')
 
     # Sentiment Distribution
@@ -149,14 +157,7 @@ def main():
     ax4.set_yscale('log')
     st.pyplot(fig4)
 
-    # Display Data Tables
-    st.header('Data Tables')
-
-    st.subheader('Filtered Video Data')
-    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
-
-    st.subheader('Filtered Comment Data')
-    st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
+    
 
 # Run the Streamlit app
 if __name__ == "__main__":
