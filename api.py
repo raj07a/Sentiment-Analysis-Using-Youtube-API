@@ -94,7 +94,7 @@ def main():
     # Merge video data with statistics
     df = pd.merge(df_videos, df_stats, on='videoId')
     
-    # Fetch and process comments for each video
+    #  comments for each video
     comments_data = []
     for video_id in df['videoId']:
         comments = fetch_video_comments(API_KEY, video_id)
@@ -102,23 +102,23 @@ def main():
     
     df_comments = pd.concat(comments_data, ignore_index=True)
     
-    # Perform sentiment analysis on descriptions
+    #  sentiment analysis on descriptions
     df = perform_sentiment_analysis(df)
     
-    # Perform sentiment analysis on comments
+    # sentiment analysis on comments
     df_comments['comment_polarity'] = df_comments['text'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
     df_comments['comment_sentiment'] = df_comments['comment_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
     
-    # Calculate overall sentiment score
+    # overall sentiment score
     df['overall_sentiment_score'] = (df['description_polarity'] + df_comments.groupby('videoId')['comment_polarity'].mean().reindex(df['videoId']).fillna(0)) / 2
     df['overall_sentiment'] = df['overall_sentiment_score'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
 
     st.write("### Sample of YouTube Video Data:")
     st.write(df.head())
 
-    # Visualizations
+    
     st.header('Video Statistics')
-    # Display Data Tables
+    # Data Tables
     st.header('Data Tables')
 
     st.subheader('Filtered Video Data')
@@ -127,11 +127,11 @@ def main():
     st.subheader('Filtered Comment Data')
     st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
 
-    # Video Statistics Summary
+    # Video Statistics 
     st.subheader('Video Statistics Summary')
     st.write(df[['views', 'likes', 'dislikes', 'comments']].describe())
 
-    # Dataset Statistics Summary
+    # Statistics 
     st.subheader('Dataset Statistics Summary')
     st.write(df.describe())
     # Sentiment Distribution
@@ -142,7 +142,7 @@ def main():
     ax1.set_title('Distribution of Overall Sentiment')
     st.pyplot(fig1)
 
-    # Like-Dislike Ratio Distribution
+    # Like-Dislike Ratio 
     st.subheader('Like-Dislike Ratio Distribution')
     df['like_dislike_ratio'] = df['likes'] / df['dislikes'].replace({0: 1})
     fig2, ax2 = plt.subplots()
@@ -150,14 +150,14 @@ def main():
     ax2.set_title('Distribution of Like-Dislike Ratio')
     st.pyplot(fig2)
 
-    # Comment Polarity Distribution
+    # Comment Polarity 
     st.subheader('Comment Polarity Distribution')
     fig3, ax3 = plt.subplots()
     sns.violinplot(data=df_comments, x='comment_polarity', ax=ax3, inner='quartile', palette='muted')
     ax3.set_title('Distribution of Comment Polarity')
     st.pyplot(fig3)
 
-    # Views vs. Likes Scatter Plot
+    # Views vs. Likes 
     st.subheader('Views vs. Likes')
     fig4, ax4 = plt.subplots()
     sns.scatterplot(data=df, x='views', y='likes', hue='overall_sentiment', palette='viridis', ax=ax4)
@@ -166,7 +166,7 @@ def main():
     ax4.set_yscale('log')
     st.pyplot(fig4)
 
-    # Word Cloud for Comments
+    # Word Cloud 
     st.subheader('Word Cloud of Comments')
     comment_words = ' '.join(df_comments['text'].tolist())
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(comment_words)
@@ -178,7 +178,7 @@ def main():
 
     
 
-# Run the Streamlit app
+
 if __name__ == "__main__":
     st.set_option('deprecation.showPyplotGlobalUse', False)
     main()
