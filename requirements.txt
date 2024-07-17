@@ -8,7 +8,10 @@ textblob
 wordcloud
 transformers
 
-# Additional Requirements
-# At least one of TensorFlow 2.0 or PyTorch should be installed.
-# To install TensorFlow 2.0, read the instructions at https://www.tensorflow.org/install/
-# To install PyTorch, read the instructions at https://pytorch.org/
+# At least one of TensorFlow 2.0 or PyTorch should be installed
+tensorflow>=2.0 ; platform_system != 'Windows' 
+torch ; platform_system != 'Windows'
+
+# Optional - Uncomment the following lines to ensure TensorFlow or PyTorch is installed
+# tensorflow>=2.0
+# torch
