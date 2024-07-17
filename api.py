@@ -3,8 +3,8 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
-from textblob import TextBlob
 from wordcloud import WordCloud
+from transformers import pipeline
 
 API_KEY = "AIzaSyDV7Wfx8L4GAe6Daxfzpk97x1RECLfZ2ho"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
@@ -73,11 +73,11 @@ def fetch_video_comments(api_key, video_id):
     
     return pd.DataFrame(comments)
 
-# Function to perform sentiment analysis using TextBlob
-def perform_sentiment_analysis(df):
-    df['description_polarity'] = df['description'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
-    df['description_sentiment'] = df['description_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
-    return df
+# Function to perform sentiment analysis using Hugging Face Transformers
+def perform_sentiment_analysis(comments):
+    sentiment_pipeline = pipeline("sentiment-analysis")
+    results = sentiment_pipeline(comments)
+    return results
 
 # Main function to fetch, process, and visualize YouTube data
 def main():
@@ -94,7 +94,7 @@ def main():
     # Merge video data with statistics
     df = pd.merge(df_videos, df_stats, on='videoId')
     
-    #  comments for each video
+    # Fetch and process comments for each video
     comments_data = []
     for video_id in df['videoId']:
         comments = fetch_video_comments(API_KEY, video_id)
@@ -102,38 +102,42 @@ def main():
     
     df_comments = pd.concat(comments_data, ignore_index=True)
     
-    #  sentiment analysis on descriptions
-    df = perform_sentiment_analysis(df)
+    # Perform sentiment analysis on descriptions
+    desc_sentiments = perform_sentiment_analysis(df['description'].tolist())
+    df['description_sentiment'] = [result['label'] for result in desc_sentiments]
+    df['description_sentiment_score'] = [result['score'] for result in desc_sentiments]
     
-    # sentiment analysis on comments
-    df_comments['comment_polarity'] = df_comments['text'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
-    df_comments['comment_sentiment'] = df_comments['comment_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
+    # Perform sentiment analysis on comments
+    comment_sentiments = perform_sentiment_analysis(df_comments['text'].tolist())
+    df_comments['comment_sentiment'] = [result['label'] for result in comment_sentiments]
+    df_comments['comment_sentiment_score'] = [result['score'] for result in comment_sentiments]
     
-    # overall sentiment score
-    df['overall_sentiment_score'] = (df['description_polarity'] + df_comments.groupby('videoId')['comment_polarity'].mean().reindex(df['videoId']).fillna(0)) / 2
-    df['overall_sentiment'] = df['overall_sentiment_score'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
+    # Calculate overall sentiment score
+    df['overall_sentiment_score'] = (df['description_sentiment_score'] + df_comments.groupby('videoId')['comment_sentiment_score'].mean().reindex(df['videoId']).fillna(0)) / 2
+    df['overall_sentiment'] = df['overall_sentiment_score'].apply(lambda x: 'POSITIVE' if x > 0.5 else ('NEGATIVE' if x < 0.5 else 'NEUTRAL'))
 
     st.write("### Sample of YouTube Video Data:")
     st.write(df.head())
 
-    
+    # Visualizations
     st.header('Video Statistics')
-    # Data Tables
+    # Display Data Tables
     st.header('Data Tables')
 
     st.subheader('Filtered Video Data')
-    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
+    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_sentiment', 'description_sentiment_score', 'overall_sentiment_score', 'overall_sentiment']])
 
     st.subheader('Filtered Comment Data')
-    st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
+    st.write(df_comments[['videoId', 'author', 'text', 'comment_sentiment', 'comment_sentiment_score']])
 
-    # Video Statistics 
+    # Video Statistics Summary
     st.subheader('Video Statistics Summary')
     st.write(df[['views', 'likes', 'dislikes', 'comments']].describe())
 
-    # Statistics 
+    # Dataset Statistics Summary
     st.subheader('Dataset Statistics Summary')
     st.write(df.describe())
+    
     # Sentiment Distribution
     st.subheader('Overall Sentiment Distribution')
     fig1, ax1 = plt.subplots()
@@ -142,7 +146,7 @@ def main():
     ax1.set_title('Distribution of Overall Sentiment')
     st.pyplot(fig1)
 
-    # Like-Dislike Ratio 
+    # Like-Dislike Ratio Distribution
     st.subheader('Like-Dislike Ratio Distribution')
     df['like_dislike_ratio'] = df['likes'] / df['dislikes'].replace({0: 1})
     fig2, ax2 = plt.subplots()
@@ -150,14 +154,14 @@ def main():
     ax2.set_title('Distribution of Like-Dislike Ratio')
     st.pyplot(fig2)
 
-    # Comment Polarity 
+    # Comment Polarity Distribution
     st.subheader('Comment Polarity Distribution')
     fig3, ax3 = plt.subplots()
-    sns.violinplot(data=df_comments, x='comment_polarity', ax=ax3, inner='quartile', palette='muted')
-    ax3.set_title('Distribution of Comment Polarity')
+    sns.violinplot(data=df_comments, x='comment_sentiment_score', ax=ax3, inner='quartile', palette='muted')
+    ax3.set_title('Distribution of Comment Sentiment Score')
     st.pyplot(fig3)
 
-    # Views vs. Likes 
+    # Views vs. Likes Scatter Plot
     st.subheader('Views vs. Likes')
     fig4, ax4 = plt.subplots()
     sns.scatterplot(data=df, x='views', y='likes', hue='overall_sentiment', palette='viridis', ax=ax4)
@@ -166,7 +170,7 @@ def main():
     ax4.set_yscale('log')
     st.pyplot(fig4)
 
-    # Word Cloud 
+    # Word Cloud for Comments
     st.subheader('Word Cloud of Comments')
     comment_words = ' '.join(df_comments['text'].tolist())
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(comment_words)
@@ -176,9 +180,7 @@ def main():
     ax5.set_title('Word Cloud of Comments')
     st.pyplot(fig5)
 
-    
-
-
+# Run the Streamlit app
 if __name__ == "__main__":
     st.set_option('deprecation.showPyplotGlobalUse', False)
     main()
