@@ -39,6 +39,8 @@ def fetch_youtube_data(api_key, channel_id):
         url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId={channel_id}&part=snippet,id&order=date&maxResults=50&pageToken={page_token}"
         response = requests.get(url).json()
         
+        st.write("API Response:", response)  # Debugging: Print the API response
+        
         for item in response.get('items', []):
             if item['id']['kind'] == 'youtube#video':
                 video_info = {
@@ -213,7 +215,6 @@ def main():
     ax5.set_title('Word Cloud of Comments')
     st.pyplot(fig5)
 
-# Run the Streamlit app
 if __name__ == "__main__":
     st.set_option('deprecation.showPyplotGlobalUse', False)
     main()
