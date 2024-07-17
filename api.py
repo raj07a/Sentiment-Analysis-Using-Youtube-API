@@ -3,11 +3,33 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
+from textblob import TextBlob
 from wordcloud import WordCloud
 from transformers import pipeline
 
 API_KEY = "AIzaSyDV7Wfx8L4GAe6Daxfzpk97x1RECLfZ2ho"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
+
+# Check if either TensorFlow or PyTorch is installed
+try:
+    import tensorflow as tf
+    tf_installed = True
+except ImportError:
+    tf_installed = False
+
+try:
+    import torch
+    torch_installed = True
+except ImportError:
+    torch_installed = False
+
+if not (tf_installed or torch_installed):
+    raise RuntimeError(
+        "At least one of TensorFlow 2.0 or PyTorch should be installed. To "
+        "install TensorFlow 2.0, read the instructions at "
+        "https://www.tensorflow.org/install/ To install PyTorch, read the instructions at "
+        "https://pytorch.org/."
+    )
 
 # Function to fetch YouTube video data
 def fetch_youtube_data(api_key, channel_id):
@@ -73,8 +95,14 @@ def fetch_video_comments(api_key, video_id):
     
     return pd.DataFrame(comments)
 
+# Function to perform sentiment analysis using TextBlob
+def perform_sentiment_analysis(df):
+    df['description_polarity'] = df['description'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
+    df['description_sentiment'] = df['description_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
+    return df
+
 # Function to perform sentiment analysis using Hugging Face Transformers
-def perform_sentiment_analysis(comments):
+def perform_transformer_sentiment_analysis(comments):
     sentiment_pipeline = pipeline("sentiment-analysis")
     results = sentiment_pipeline(comments)
     return results
@@ -103,18 +131,16 @@ def main():
     df_comments = pd.concat(comments_data, ignore_index=True)
     
     # Perform sentiment analysis on descriptions
-    desc_sentiments = perform_sentiment_analysis(df['description'].tolist())
-    df['description_sentiment'] = [result['label'] for result in desc_sentiments]
-    df['description_sentiment_score'] = [result['score'] for result in desc_sentiments]
+    df = perform_sentiment_analysis(df)
     
-    # Perform sentiment analysis on comments
-    comment_sentiments = perform_sentiment_analysis(df_comments['text'].tolist())
-    df_comments['comment_sentiment'] = [result['label'] for result in comment_sentiments]
-    df_comments['comment_sentiment_score'] = [result['score'] for result in comment_sentiments]
+    # Perform sentiment analysis on comments using Hugging Face Transformers
+    transformer_results = perform_transformer_sentiment_analysis(df_comments['text'].tolist())
+    df_comments['transformer_sentiment'] = [result['label'] for result in transformer_results]
+    df_comments['transformer_confidence'] = [result['score'] for result in transformer_results]
     
     # Calculate overall sentiment score
-    df['overall_sentiment_score'] = (df['description_sentiment_score'] + df_comments.groupby('videoId')['comment_sentiment_score'].mean().reindex(df['videoId']).fillna(0)) / 2
-    df['overall_sentiment'] = df['overall_sentiment_score'].apply(lambda x: 'POSITIVE' if x > 0.5 else ('NEGATIVE' if x < 0.5 else 'NEUTRAL'))
+    df['overall_sentiment_score'] = (df['description_polarity'] + df_comments.groupby('videoId')['comment_polarity'].mean().reindex(df['videoId']).fillna(0)) / 2
+    df['overall_sentiment'] = df['overall_sentiment_score'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
 
     st.write("### Sample of YouTube Video Data:")
     st.write(df.head())
@@ -125,10 +151,10 @@ def main():
     st.header('Data Tables')
 
     st.subheader('Filtered Video Data')
-    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_sentiment', 'description_sentiment_score', 'overall_sentiment_score', 'overall_sentiment']])
+    st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
 
     st.subheader('Filtered Comment Data')
-    st.write(df_comments[['videoId', 'author', 'text', 'comment_sentiment', 'comment_sentiment_score']])
+    st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment', 'transformer_sentiment', 'transformer_confidence']])
 
     # Video Statistics Summary
     st.subheader('Video Statistics Summary')
@@ -137,7 +163,6 @@ def main():
     # Dataset Statistics Summary
     st.subheader('Dataset Statistics Summary')
     st.write(df.describe())
-    
     # Sentiment Distribution
     st.subheader('Overall Sentiment Distribution')
     fig1, ax1 = plt.subplots()
@@ -157,8 +182,8 @@ def main():
     # Comment Polarity Distribution
     st.subheader('Comment Polarity Distribution')
     fig3, ax3 = plt.subplots()
-    sns.violinplot(data=df_comments, x='comment_sentiment_score', ax=ax3, inner='quartile', palette='muted')
-    ax3.set_title('Distribution of Comment Sentiment Score')
+    sns.violinplot(data=df_comments, x='comment_polarity', ax=ax3, inner='quartile', palette='muted')
+    ax3.set_title('Distribution of Comment Polarity')
     st.pyplot(fig3)
 
     # Views vs. Likes Scatter Plot
