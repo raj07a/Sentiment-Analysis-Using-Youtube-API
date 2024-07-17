@@ -115,9 +115,17 @@ def main():
     
     # Fetch video data from YouTube API
     df_videos = fetch_youtube_data(API_KEY, CHANNEL_ID)
+    st.write("Fetched video data:")
+    st.write(df_videos.head())
     
+    if 'videoId' not in df_videos.columns:
+        st.error("Failed to retrieve video IDs.")
+        return
+
     # Fetch video statistics
     df_stats = fetch_video_statistics(API_KEY, df_videos['videoId'])
+    st.write("Fetched video statistics:")
+    st.write(df_stats.head())
     
     # Merge video data with statistics
     df = pd.merge(df_videos, df_stats, on='videoId')
