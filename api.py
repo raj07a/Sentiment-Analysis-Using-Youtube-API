@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from textblob import TextBlob
 from wordcloud import WordCloud
+import re
 
 API_KEY = "AIzaSyDV7Wfx8L4GAe6Daxfzpk97x1RECLfZ2ho"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
@@ -73,9 +74,17 @@ def fetch_video_comments(api_key, video_id):
     
     return pd.DataFrame(comments)
 
+# Function to clean text data
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)  # Remove extra whitespace
+    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
+    return text
+
 # Function to perform sentiment analysis using TextBlob
 def perform_sentiment_analysis(df):
-    df['description_polarity'] = df['description'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
+    df['description'] = df['description'].apply(clean_text)
+    df['description_polarity'] = df['description'].apply(lambda x: TextBlob(x).sentiment.polarity)
     df['description_sentiment'] = df['description_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
     return df
 
@@ -94,7 +103,7 @@ def main():
     # Merge video data with statistics
     df = pd.merge(df_videos, df_stats, on='videoId')
     
-    #  comments for each video
+    # Fetch comments for each video
     comments_data = []
     for video_id in df['videoId']:
         comments = fetch_video_comments(API_KEY, video_id)
@@ -102,38 +111,37 @@ def main():
     
     df_comments = pd.concat(comments_data, ignore_index=True)
     
-    #  sentiment analysis on descriptions
+    # Perform sentiment analysis on video descriptions
     df = perform_sentiment_analysis(df)
     
-    # sentiment analysis on comments
-    df_comments['comment_polarity'] = df_comments['text'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
+    # Perform sentiment analysis on comments
+    df_comments['text'] = df_comments['text'].apply(clean_text)
+    df_comments['comment_polarity'] = df_comments['text'].apply(lambda x: TextBlob(x).sentiment.polarity)
     df_comments['comment_sentiment'] = df_comments['comment_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
     
-    # overall sentiment score
-    df['overall_sentiment_score'] = (df['description_polarity'] + df_comments.groupby('videoId')['comment_polarity'].mean().reindex(df['videoId']).fillna(0)) / 2
+    # Calculate overall sentiment score
+    df['overall_sentiment_score'] = (
+        df['description_polarity'] +
+        df_comments.groupby('videoId')['comment_polarity'].mean().reindex(df['videoId']).fillna(0)
+    ) / 2
     df['overall_sentiment'] = df['overall_sentiment_score'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
 
     st.write("### Sample of YouTube Video Data:")
     st.write(df.head())
 
-    
     st.header('Video Statistics')
-    # Data Tables
-    st.header('Data Tables')
-
     st.subheader('Filtered Video Data')
     st.write(df[['title', 'views', 'likes', 'dislikes', 'description_polarity', 'overall_sentiment_score', 'overall_sentiment']])
 
     st.subheader('Filtered Comment Data')
     st.write(df_comments[['videoId', 'author', 'text', 'comment_polarity', 'comment_sentiment']])
 
-    # Video Statistics 
     st.subheader('Video Statistics Summary')
     st.write(df[['views', 'likes', 'dislikes', 'comments']].describe())
 
-    # Statistics 
     st.subheader('Dataset Statistics Summary')
     st.write(df.describe())
+
     # Sentiment Distribution
     st.subheader('Overall Sentiment Distribution')
     fig1, ax1 = plt.subplots()
@@ -142,7 +150,7 @@ def main():
     ax1.set_title('Distribution of Overall Sentiment')
     st.pyplot(fig1)
 
-    # Like-Dislike Ratio 
+    # Like-Dislike Ratio
     st.subheader('Like-Dislike Ratio Distribution')
     df['like_dislike_ratio'] = df['likes'] / df['dislikes'].replace({0: 1})
     fig2, ax2 = plt.subplots()
@@ -150,14 +158,14 @@ def main():
     ax2.set_title('Distribution of Like-Dislike Ratio')
     st.pyplot(fig2)
 
-    # Comment Polarity 
+    # Comment Polarity
     st.subheader('Comment Polarity Distribution')
     fig3, ax3 = plt.subplots()
     sns.violinplot(data=df_comments, x='comment_polarity', ax=ax3, inner='quartile', palette='muted')
     ax3.set_title('Distribution of Comment Polarity')
     st.pyplot(fig3)
 
-    # Views vs. Likes 
+    # Views vs. Likes
     st.subheader('Views vs. Likes')
     fig4, ax4 = plt.subplots()
     sns.scatterplot(data=df, x='views', y='likes', hue='overall_sentiment', palette='viridis', ax=ax4)
@@ -166,7 +174,7 @@ def main():
     ax4.set_yscale('log')
     st.pyplot(fig4)
 
-    # Word Cloud 
+    # Word Cloud
     st.subheader('Word Cloud of Comments')
     comment_words = ' '.join(df_comments['text'].tolist())
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(comment_words)
@@ -175,9 +183,6 @@ def main():
     ax5.axis('off')
     ax5.set_title('Word Cloud of Comments')
     st.pyplot(fig5)
-
-    
-
 
 if __name__ == "__main__":
     main()
