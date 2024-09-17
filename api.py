@@ -7,8 +7,8 @@ from textblob import TextBlob
 from wordcloud import WordCloud
 
 # API key and channel ID (Replace with your YouTube API Key and Channel ID)
-API_KEY = "AIzaSyDV7Wfx8L4GAe6Daxfzpk97x1RECLfZ2ho"
-CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
+API_KEY = "YOUR_API_KEY"
+CHANNEL_ID = "YOUR_CHANNEL_ID"
 
 # Function to fetch YouTube video data
 def fetch_youtube_data(api_key, channel_id):
@@ -16,9 +16,14 @@ def fetch_youtube_data(api_key, channel_id):
     page_token = ''
     while True:
         url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId={channel_id}&part=snippet,id&order=date&maxResults=50&pageToken={page_token}"
-        response = requests.get(url).json()
+        response = requests.get(url)
+        response_json = response.json()
         
-        for item in response.get('items', []):
+        if response.status_code != 200:
+            st.error(f"Error fetching YouTube data: {response_json}")
+            break
+        
+        for item in response_json.get('items', []):
             if item['id']['kind'] == 'youtube#video':
                 video_info = {
                     'videoId': item['id']['videoId'],
@@ -28,7 +33,7 @@ def fetch_youtube_data(api_key, channel_id):
                 }
                 videos.append(video_info)
         
-        page_token = response.get('nextPageToken', '')
+        page_token = response_json.get('nextPageToken', '')
         if not page_token:
             break
     
@@ -39,8 +44,14 @@ def fetch_video_statistics(api_key, video_ids):
     stats = []
     for video_id in video_ids:
         url = f"https://www.googleapis.com/youtube/v3/videos?key={api_key}&id={video_id}&part=statistics"
-        response = requests.get(url).json()
-        for item in response.get('items', []):
+        response = requests.get(url)
+        response_json = response.json()
+        
+        if response.status_code != 200:
+            st.error(f"Error fetching video statistics: {response_json}")
+            continue
+        
+        for item in response_json.get('items', []):
             stat = {
                 'videoId': video_id,
                 'views': int(item['statistics'].get('viewCount', 0)),
@@ -57,9 +68,14 @@ def fetch_video_comments(api_key, video_id):
     page_token = ''
     while True:
         url = f"https://www.googleapis.com/youtube/v3/commentThreads?key={api_key}&videoId={video_id}&part=snippet&maxResults=100&pageToken={page_token}"
-        response = requests.get(url).json()
+        response = requests.get(url)
+        response_json = response.json()
         
-        for item in response.get('items', []):
+        if response.status_code != 200:
+            st.error(f"Error fetching comments: {response_json}")
+            break
+        
+        for item in response_json.get('items', []):
             comment = item['snippet']['topLevelComment']['snippet']
             comments.append({
                 'videoId': video_id,
@@ -68,7 +84,7 @@ def fetch_video_comments(api_key, video_id):
                 'publishedAt': comment['publishedAt']
             })
         
-        page_token = response.get('nextPageToken', '')
+        page_token = response_json.get('nextPageToken', '')
         if not page_token:
             break
     
@@ -89,8 +105,16 @@ def main():
     # Fetch video data from YouTube API
     df_videos = fetch_youtube_data(API_KEY, CHANNEL_ID)
     
+    if df_videos.empty:
+        st.warning("No video data found.")
+        return
+    
     # Fetch video statistics
     df_stats = fetch_video_statistics(API_KEY, df_videos['videoId'])
+    
+    if df_stats.empty:
+        st.warning("No video statistics found.")
+        return
     
     # Merge video data with statistics
     df = pd.merge(df_videos, df_stats, on='videoId')
@@ -100,6 +124,10 @@ def main():
     for video_id in df['videoId']:
         comments = fetch_video_comments(API_KEY, video_id)
         comments_data.append(comments)
+    
+    if not comments_data:
+        st.warning("No comments data found.")
+        return
     
     df_comments = pd.concat(comments_data, ignore_index=True)
     
