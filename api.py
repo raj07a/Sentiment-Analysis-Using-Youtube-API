@@ -8,7 +8,7 @@ from wordcloud import WordCloud
 
 # API key and channel ID (Replace with your YouTube API Key)
 API_KEY = "YOUR_API_KEY"
-CHANNEL_ID = "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+CHANNEL_ID = "UCsT0YIqwnpJCM-mx7-gSA4Q"
 
 # Function to fetch YouTube video data
 def fetch_youtube_data(api_key, channel_id):
@@ -21,7 +21,11 @@ def fetch_youtube_data(api_key, channel_id):
         
         if response.status_code != 200:
             st.error(f"Error fetching YouTube data: {response_json}")
-            break
+            return pd.DataFrame()  # Return an empty DataFrame
+        
+        if 'items' not in response_json:
+            st.error("No 'items' found in the response.")
+            return pd.DataFrame()
         
         for item in response_json.get('items', []):
             if item['id']['kind'] == 'youtube#video':
@@ -51,6 +55,10 @@ def fetch_video_statistics(api_key, video_ids):
             st.error(f"Error fetching video statistics: {response_json}")
             continue
         
+        if 'items' not in response_json:
+            st.error("No 'items' found in the response.")
+            continue
+        
         for item in response_json.get('items', []):
             stat = {
                 'videoId': video_id,
@@ -73,7 +81,11 @@ def fetch_video_comments(api_key, video_id):
         
         if response.status_code != 200:
             st.error(f"Error fetching comments: {response_json}")
-            break
+            return pd.DataFrame()  # Return an empty DataFrame
+        
+        if 'items' not in response_json:
+            st.error("No 'items' found in the response.")
+            return pd.DataFrame()
         
         for item in response_json.get('items', []):
             comment = item['snippet']['topLevelComment']['snippet']
@@ -123,7 +135,8 @@ def main():
     comments_data = []
     for video_id in df['videoId']:
         comments = fetch_video_comments(API_KEY, video_id)
-        comments_data.append(comments)
+        if not comments.empty:
+            comments_data.append(comments)
     
     if not comments_data:
         st.warning("No comments data found.")
@@ -194,11 +207,10 @@ def main():
     st.subheader('Word Cloud of Comments')
     comment_words = ' '.join(df_comments['text'].tolist())
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(comment_words)
-    fig5, ax5 = plt.subplots()
-    ax5.imshow(wordcloud, interpolation='bilinear')
-    ax5.axis('off')
-    ax5.set_title('Word Cloud of Comments')
-    st.pyplot(fig5)
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    st.pyplot(plt)
 
 if __name__ == "__main__":
     main()
