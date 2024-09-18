@@ -8,7 +8,7 @@ from wordcloud import WordCloud
 
 # API key and channel ID (Replace with your YouTube API Key and Channel ID)
 API_KEY = "AIzaSyAdQav-iU4TAW9r9LIBYPl2l3-VcZjJslU"
-CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
+CHANNEL_ID = "UCzQUP1qoWDoEbmsQxvdjxgQ"
 
 # Function to fetch YouTube video data
 def fetch_youtube_data(api_key, channel_id):
