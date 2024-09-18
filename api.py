@@ -7,7 +7,7 @@ from textblob import TextBlob
 from wordcloud import WordCloud
 
 # API key and channel ID (Replace with your YouTube API Key and Channel ID)
-API_KEY = "AIzaSyB7ZOI3o2nRUlhiwXWA49H-nTkQyvUGzaI"
+API_KEY = "AIzaSyBY6kSnQUuTrlT91zzEAF_5QZZHaqtMM8I"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
 
 # Function to fetch YouTube video data
