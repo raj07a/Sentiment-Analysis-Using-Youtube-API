@@ -10,34 +10,34 @@ from wordcloud import WordCloud
 API_KEY = "AIzaSyBY6kSnQUuTrlT91zzEAF_5QZZHaqtMM8I"
 CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
 
-# Function to fetch YouTube video data
-def fetch_youtube_data(api_key, channel_id):
-    videos = []
+# Function to fetch comments for a video
+def fetch_video_comments(api_key, video_id):
+    comments = []
     page_token = ''
     while True:
-        url = f"https://www.googleapis.com/youtube/v3/search?key={api_key}&channelId={channel_id}&part=snippet,id&order=date&maxResults=50&pageToken={page_token}"
-        response = requests.get(url)
-        response_json = response.json()
+        url = f"https://www.googleapis.com/youtube/v3/commentThreads?key={api_key}&videoId={video_id}&part=snippet&maxResults=100&pageToken={page_token}"
+        response = requests.get(url).json()
         
-        if response.status_code != 200:
-            st.error(f"Error fetching YouTube data: {response_json}")
-            break
+        # Check for errors in the API response (like disabled comments)
+        if 'error' in response:
+            st.warning(f"Error fetching comments for videoId {video_id}: {response['error']['message']}")
+            break  # Skip this video if comments are disabled
         
-        for item in response_json.get('items', []):
-            if item['id']['kind'] == 'youtube#video':
-                video_info = {
-                    'videoId': item['id']['videoId'],
-                    'title': item['snippet']['title'],
-                    'description': item['snippet']['description'],
-                    'publishedAt': item['snippet']['publishedAt']
-                }
-                videos.append(video_info)
+        for item in response.get('items', []):
+            comment = item['snippet']['topLevelComment']['snippet']
+            comments.append({
+                'videoId': video_id,
+                'author': comment['authorDisplayName'],
+                'text': comment['textDisplay'],
+                'publishedAt': comment['publishedAt']
+            })
         
-        page_token = response_json.get('nextPageToken', '')
+        page_token = response.get('nextPageToken', '')
         if not page_token:
             break
     
-    return pd.DataFrame(videos)
+    return pd.DataFrame(comments)
+
 
 # Function to fetch video statistics
 def fetch_video_statistics(api_key, video_ids):
