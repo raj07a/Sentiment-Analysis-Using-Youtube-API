@@ -71,10 +71,17 @@ def fetch_video_comments(api_key, video_id):
         response = requests.get(url)
         response_json = response.json()
         
+        # Check for errors and skip videos with disabled comments
         if response.status_code != 200:
-            st.error(f"Error fetching comments: {response_json}")
-            break
+            error_reason = response_json.get('error', {}).get('errors', [{}])[0].get('reason', '')
+            if error_reason == 'commentsDisabled':
+                st.warning(f"Comments are disabled for video ID: {video_id}. Skipping...")
+                break
+            else:
+                st.error(f"Error fetching comments for video ID {video_id}: {response_json}")
+                break
         
+        # Extract comments
         for item in response_json.get('items', []):
             comment = item['snippet']['topLevelComment']['snippet']
             comments.append({
@@ -84,6 +91,7 @@ def fetch_video_comments(api_key, video_id):
                 'publishedAt': comment['publishedAt']
             })
         
+        # Check for next page
         page_token = response_json.get('nextPageToken', '')
         if not page_token:
             break
@@ -123,8 +131,9 @@ def main():
     comments_data = []
     for video_id in df['videoId']:
         comments = fetch_video_comments(API_KEY, video_id)
-        comments_data.append(comments)
-    
+        if not comments.empty:
+            comments_data.append(comments)
+
     if not comments_data:
         st.warning("No comments data found.")
         return
