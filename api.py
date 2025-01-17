@@ -136,7 +136,7 @@ def main():
             )
 
             # Display comment sentiment distribution
-            st.subheader('Specific Video Comment Sentiment Distribution')
+            st.subheader(' Video Comment Sentiment Distribution')
             fig, ax = plt.subplots()
             specific_comments['comment_sentiment'].value_counts().plot(kind='bar', ax=ax, color='skyblue')
             ax.set_title('Sentiment Distribution for Specific Video')
