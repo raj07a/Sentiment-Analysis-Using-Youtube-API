@@ -152,20 +152,6 @@ def main():
             ax2.set_title('Word Cloud of Comments')
             st.pyplot(fig2)
 
-            # **New Visualizations**
-            # 1. Sentiment Over Time (Comments vs Time)
-            st.subheader('Sentiment Over Time (Comments vs Time)')
-            specific_comments['publishedAt'] = pd.to_datetime(specific_comments['publishedAt'])
-            specific_comments['year_month'] = specific_comments['publishedAt'].dt.to_period('M')
-            sentiment_time = specific_comments.groupby('year_month')['comment_polarity'].mean().reset_index()
-            fig3, ax3 = plt.subplots()
-            ax3.plot(sentiment_time['year_month'].astype(str), sentiment_time['comment_polarity'], marker='o', color='green')
-            ax3.set_title('Average Sentiment Over Time')
-            ax3.set_xlabel('Time (Year-Month)')
-            ax3.set_ylabel('Average Sentiment')
-            plt.xticks(rotation=45)
-            st.pyplot(fig3)
-
             # 2. Top Comment Authors
             st.subheader('Top Comment Authors')
             top_authors = specific_comments['author'].value_counts().head(10)
