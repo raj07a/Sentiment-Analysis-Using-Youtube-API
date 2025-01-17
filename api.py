@@ -5,13 +5,36 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from textblob import TextBlob
 from wordcloud import WordCloud
-import datetime
+from urllib.parse import urlparse, parse_qs
 
-# API key and default channel ID (Replace with your API Key and Channel ID)
+# YouTube API Key
 API_KEY = "AIzaSyDV7Wfx8L4GAe6Daxfzpk97x1RECLfZ2ho"
-CHANNEL_ID = "UCDDjMFHTsEerSEm2BvhcwrA"
 
-# Function to fetch YouTube channel video data
+# Function to resolve channel ID from username-based URL (e.g., @SonySAB)
+def resolve_channel_id_from_username(api_key, username):
+    url = f"https://www.googleapis.com/youtube/v3/channels?part=id&forUsername={username.replace('@', '')}&key={api_key}"
+    response = requests.get(url)
+    response_json = response.json()
+
+    if response.status_code == 200 and 'items' in response_json and len(response_json['items']) > 0:
+        return response_json['items'][0]['id']
+    else:
+        st.error("Unable to resolve channel ID from username. Please check the link or try another channel.")
+        return None
+
+# Function to extract channel ID from a YouTube channel link
+def extract_channel_id(channel_url):
+    parsed_url = urlparse(channel_url)
+    if "@" in parsed_url.path:  # Handle username-based URL
+        username = parsed_url.path.split("/")[-1]
+        return resolve_channel_id_from_username(API_KEY, username)
+    elif "channel" in parsed_url.path:  # Handle channel-based URL
+        return parsed_url.path.split("/")[-1]
+    else:
+        st.error("Invalid YouTube channel link. Please provide a valid link.")
+        return None
+
+# Function to fetch video data for a channel
 def fetch_youtube_data(api_key, channel_id):
     videos = []
     page_token = ''
@@ -28,9 +51,7 @@ def fetch_youtube_data(api_key, channel_id):
             if item['id']['kind'] == 'youtube#video':
                 video_info = {
                     'videoId': item['id']['videoId'],
-                    'title': item['snippet']['title'],
-                    'description': item['snippet']['description'],
-                    'publishedAt': item['snippet']['publishedAt']
+                    'title': item['snippet']['title']
                 }
                 videos.append(video_info)
 
@@ -39,33 +60,6 @@ def fetch_youtube_data(api_key, channel_id):
             break
 
     return pd.DataFrame(videos)
-
-# Function to fetch specific video data
-def fetch_specific_video(api_key, video_id):
-    url = f"https://www.googleapis.com/youtube/v3/videos?key={api_key}&id={video_id}&part=snippet,statistics"
-    response = requests.get(url)
-    response_json = response.json()
-
-    if response.status_code != 200:
-        st.error(f"Error fetching video data for ID {video_id}: {response_json}")
-        return None
-
-    if 'items' in response_json and response_json['items']:
-        item = response_json['items'][0]
-        video_info = {
-            'videoId': video_id,
-            'title': item['snippet']['title'],
-            'description': item['snippet']['description'],
-            'publishedAt': item['snippet']['publishedAt'],
-            'views': int(item['statistics'].get('viewCount', 0)),
-            'likes': int(item['statistics'].get('likeCount', 0)),
-            'dislikes': int(item['statistics'].get('dislikeCount', 0)),
-            'comments': int(item['statistics'].get('commentCount', 0))
-        }
-        return pd.DataFrame([video_info])
-    else:
-        st.warning(f"No data found for video ID: {video_id}")
-        return None
 
 # Function to fetch comments for a video
 def fetch_video_comments(api_key, video_id):
@@ -76,7 +70,6 @@ def fetch_video_comments(api_key, video_id):
         response = requests.get(url)
         response_json = response.json()
 
-        # Check for errors and skip videos with disabled comments
         if response.status_code != 200:
             error_reason = response_json.get('error', {}).get('errors', [{}])[0].get('reason', '')
             if error_reason == 'commentsDisabled':
@@ -102,79 +95,84 @@ def fetch_video_comments(api_key, video_id):
     return pd.DataFrame(comments)
 
 # Function to perform sentiment analysis using TextBlob
-def perform_sentiment_analysis(df):
-    df['description_polarity'] = df['description'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
-    df['description_sentiment'] = df['description_polarity'].apply(lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral'))
-    return df
+def perform_sentiment_analysis(comments):
+    comments['comment_polarity'] = comments['text'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
+    comments['comment_sentiment'] = comments['comment_polarity'].apply(
+        lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral')
+    )
+    return comments
 
-# Main function to fetch, process, and visualize YouTube data
+# Main function
 def main():
-    st.title('YouTube Sentiment Analysis Dashboard')
+    st.title('YouTube Channel Sentiment Analysis Dashboard')
 
-    # Add a specific video ID
-    specific_video_id = "xfUQL1ByVbI"
-    st.write(f"Analyzing specific video ID: {specific_video_id}")
+    # Step 1: Input for YouTube channel link
+    channel_url = st.text_input("Enter YouTube Channel Link (e.g., https://www.youtube.com/@SonySAB):", "")
+    if channel_url:
+        channel_id = extract_channel_id(channel_url)
+        if channel_id:
+            st.success(f"Channel ID resolved: {channel_id}")
 
-    # Fetch specific video data
-    specific_video_data = fetch_specific_video(API_KEY, specific_video_id)
+            # Step 2: Fetch videos for the channel
+            video_data = fetch_youtube_data(API_KEY, channel_id)
 
-    if specific_video_data is not None:
-        st.write("Specific Video Data:")
-        st.write(specific_video_data)
+            if not video_data.empty:
+                st.write("Available Videos:")
+                st.write(video_data)
 
-        # Fetch comments for the specific video
-        specific_comments = fetch_video_comments(API_KEY, specific_video_id)
+                # Step 3: Create a dropdown for video selection
+                video_title_to_id = dict(zip(video_data['title'], video_data['videoId']))
+                selected_video_title = st.selectbox("Select a Video for Analysis:", video_data['title'])
+                selected_video_id = video_title_to_id[selected_video_title]
 
-        if not specific_comments.empty:
-            st.write("Specific Video Comments:")
-            st.write(specific_comments)
+                st.success(f"Selected Video: {selected_video_title} (ID: {selected_video_id})")
 
-            # Perform sentiment analysis on the specific video comments
-            specific_comments['comment_polarity'] = specific_comments['text'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
-            specific_comments['comment_sentiment'] = specific_comments['comment_polarity'].apply(
-                lambda x: 'positive' if x > 0 else ('negative' if x < 0 else 'neutral')
-            )
+                # Step 4: Fetch comments for the selected video
+                comments = fetch_video_comments(API_KEY, selected_video_id)
+                if not comments.empty:
+                    st.write("Sample Comments:")
+                    st.write(comments.head())
 
-            # Display comment sentiment distribution
-            st.subheader('Specific Video Comment Sentiment Distribution')
-            fig, ax = plt.subplots()
-            specific_comments['comment_sentiment'].value_counts().plot(kind='bar', ax=ax, color='skyblue')
-            ax.set_title('Sentiment Distribution for Specific Video')
-            st.pyplot(fig)
+                    # Step 5: Perform sentiment analysis
+                    comments = perform_sentiment_analysis(comments)
 
-            # Display word cloud of comments
-            st.subheader('Word Cloud of Comments')
-            comment_words = ' '.join(specific_comments['text'].tolist())
-            wordcloud = WordCloud(width=800, height=400, background_color='white').generate(comment_words)
-            fig2, ax2 = plt.subplots()
-            ax2.imshow(wordcloud, interpolation='bilinear')
-            ax2.axis('off')
-            ax2.set_title('Word Cloud of Comments')
-            st.pyplot(fig2)
+                    # Sentiment Distribution
+                    st.subheader('Comment Sentiment Distribution')
+                    fig, ax = plt.subplots()
+                    comments['comment_sentiment'].value_counts().plot(kind='bar', ax=ax, color='skyblue')
+                    ax.set_title('Sentiment Distribution')
+                    ax.set_xlabel('Sentiment')
+                    ax.set_ylabel('Number of Comments')
+                    st.pyplot(fig)
 
-            # 2. Top Comment Authors
-            st.subheader('Top Comment Authors')
-            top_authors = specific_comments['author'].value_counts().head(10)
-            fig4, ax4 = plt.subplots()
-            top_authors.plot(kind='bar', ax=ax4, color='orange')
-            ax4.set_title('Top Comment Authors')
-            ax4.set_xlabel('Authors')
-            ax4.set_ylabel('Number of Comments')
-            st.pyplot(fig4)
+                    # Word Cloud
+                    st.subheader('Word Cloud of Comments')
+                    comment_words = ' '.join(comments['text'].tolist())
+                    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(comment_words)
+                    fig2, ax2 = plt.subplots()
+                    ax2.imshow(wordcloud, interpolation='bilinear')
+                    ax2.axis('off')
+                    ax2.set_title('Word Cloud of Comments')
+                    st.pyplot(fig2)
 
-            # 3. Comments Distribution by Sentiment (Pie Chart)
-            st.subheader('Comments Distribution by Sentiment')
-            sentiment_counts = specific_comments['comment_sentiment'].value_counts()
-            fig5, ax5 = plt.subplots()
-            sentiment_counts.plot(kind='pie', autopct='%1.1f%%', colors=['#66c2a5', '#fc8d62', '#8da0cb'], ax=ax5)
-            ax5.set_ylabel('')
-            ax5.set_title('Sentiment Distribution for Comments')
-            st.pyplot(fig5)
+                    # Top Comment Authors
+                    st.subheader('Top Comment Authors')
+                    top_authors = comments['author'].value_counts().head(10)
+                    fig3, ax3 = plt.subplots()
+                    top_authors.plot(kind='bar', ax=ax3, color='orange')
+                    ax3.set_title('Top Comment Authors')
+                    ax3.set_xlabel('Author')
+                    ax3.set_ylabel('Number of Comments')
+                    st.pyplot(fig3)
 
+                else:
+                    st.warning("No comments found for the selected video.")
+            else:
+                st.warning("No videos found for this channel.")
         else:
-            st.warning(f"No comments found for video ID: {specific_video_id}")
+            st.error("Failed to resolve channel ID. Please check the link.")
     else:
-        st.warning(f"Specific video data could not be fetched.")
+        st.info("Please enter a valid YouTube channel link.")
 
 if __name__ == "__main__":
     main()
